@@ -1,4 +1,9 @@
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Always load apps/api/.env regardless of the process cwd (evals run from /evals).
+loadEnv({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '.env'), quiet: true });
 
 function env(name: string, fallback?: string): string {
   const v = process.env[name] ?? fallback;

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ask-docs · plain page</title>
+  <!-- Deliberately hostile host CSS: the widget must not inherit any of it. -->
+  <style>
+    * { font-family: 'Comic Sans MS', cursive; color: red; }
+    p { background: yellow; }
+    a { color: blue !important; text-decoration: line-through; }
+    button { border: 5px dotted orange; }
+  </style>
+</head>
+<body>
+  <p>Plain HTML page, no bundler, no framework. Loads the built IIFE bundle.</p>
+  <ask-docs api-url="http://localhost:8787" site-token="pk_demo_vuejs" docs-origin="https://vuejs.org"></ask-docs>
+  <script src="../dist/ask-docs.iife.js"></script>
+</body>
+</html>
