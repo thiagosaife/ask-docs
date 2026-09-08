@@ -148,8 +148,23 @@ See open questions.
 ```bash
 pnpm install && pnpm db:up && pnpm db:migrate         # Docker Desktop must be running
 cp .env.example apps/api/.env                          # add ANTHROPIC_API_KEY, OPENAI_API_KEY
+pnpm ingest --dry-run                                  # crawl + chunk only, no keys needed (81 pages, 515 chunks, ~10 s)
 pnpm ingest                                            # ~80 pages, ~1 min with cache
 pnpm --filter @ask-docs/api dev                        # http://localhost:8787
 pnpm --filter @ask-docs/widget dev                     # http://localhost:5173/demo/index.html
 pnpm eval                                              # writes eval_runs + evals/results/*.json
 ```
+
+## Open questions
+
+- **Widget size.** 52 KB gzip vs the 30 KB target. Vue's runtime-dom alone is ~43 KB gzip, so the target is not
+  reachable with Vue 3.5 as the renderer. Options: (a) accept ~50 KB and document it, (b) drop Vue for the element
+  and hand-write the DOM (~10 KB total), (c) wait for a Vapor build that does not pull both runtimes.
+- **Lexical arm.** `ts_rank_cd` has no length normalisation or IDF; ParadeDB `pg_search` (real BM25) is the upgrade
+  path if recall@5 on keyword-heavy questions (API names, option keys) turns out weak.
+- **Small chunks.** Forward-merge leaves ~20 of 515 chunks under 100 tokens (the last section on a page has no
+  sibling to merge into). Merge those backward into the previous chunk if they show up as noise in top-5.
+- **Rate limiting.** Token bucket and daily budget are in-memory; a Redis implementation is needed before more than
+  one API replica.
+- **Faithfulness judge cost.** 40 cases × claims × gpt-5-mini per eval run; fine for iteration, but a cached
+  judge result per `(answer hash)` would make re-runs of unchanged prompts free.
