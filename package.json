@@ -1,0 +1,20 @@
+{
+  "name": "ask-docs",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@12.3.4",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "db:up": "docker compose up -d db",
+    "db:migrate": "pnpm --filter @ask-docs/api migrate",
+    "ingest": "pnpm --filter @ask-docs/api ingest",
+    "eval": "pnpm --filter @ask-docs/evals eval"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}

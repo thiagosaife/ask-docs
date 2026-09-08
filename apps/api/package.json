@@ -1,0 +1,42 @@
+{
+  "name": "@ask-docs/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./answer": "./src/lib/answer.ts",
+    "./db": "./src/lib/db.ts",
+    "./config": "./src/lib/config.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "migrate": "tsx src/migrate.ts",
+    "ingest": "tsx src/cli/ingest.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.50",
+    "@ai-sdk/openai": "^4.0.62",
+    "@hono/node-server": "^2.1.1",
+    "@huggingface/transformers": "^4.2.0",
+    "ai": "^7.0.94",
+    "cheerio": "^1.2.0",
+    "domhandler": "^5.0.3",
+    "dotenv": "^17.2.0",
+    "hono": "^4.13.7",
+    "js-tiktoken": "^1.0.21",
+    "langfuse": "^3.38.20",
+    "postgres": "^3.4.9",
+    "turndown": "^7.2.4",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/turndown": "^5.0.6",
+    "tsx": "^4.23.13",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.0"
+  }
+}

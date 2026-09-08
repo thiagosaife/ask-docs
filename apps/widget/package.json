@@ -1,0 +1,26 @@
+{
+  "name": "@ask-docs/widget",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/size-check.mjs",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.15",
+    "snarkdown": "^2.0.0",
+    "vue": "^3.5.42"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.8",
+    "happy-dom": "^20.14.0",
+    "typescript": "~5.9.3",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0",
+    "vue-tsc": "^3.3.11"
+  }
+}

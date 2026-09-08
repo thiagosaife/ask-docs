@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - evals
+allowBuilds:
+  '@playwright/browser-chromium': false
+  '@swc/core': true
+  esbuild: true
+  onnxruntime-node: true
+  protobufjs: true
+  sharp: true
