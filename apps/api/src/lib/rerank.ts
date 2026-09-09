@@ -23,8 +23,15 @@ let loading: Promise<Reranker> | undefined;
 async function loadLocal(): Promise<Reranker> {
   const tf = await import('@huggingface/transformers');
   tf.env.cacheDir = modelsDir;
-  const tokenizer = await tf.AutoTokenizer.from_pretrained(MODEL_ID);
-  const model = await tf.AutoModelForSequenceClassification.from_pretrained(MODEL_ID, { dtype: 'q8' });
+  let tokenizer: Awaited<ReturnType<typeof tf.AutoTokenizer.from_pretrained>>;
+  let model: Awaited<ReturnType<typeof tf.AutoModelForSequenceClassification.from_pretrained>>;
+  try {
+    tokenizer = await tf.AutoTokenizer.from_pretrained(MODEL_ID);
+    model = await tf.AutoModelForSequenceClassification.from_pretrained(MODEL_ID, { dtype: 'q8' });
+  } catch (e) {
+    loading = undefined; // do not cache the failure; the next request retries the download
+    throw new Error(`local re-rank model ${MODEL_ID} failed to load (cache ${modelsDir}): ${(e as Error).message}`);
+  }
   return {
     name: MODEL_ID,
     async score(query, docs) {
@@ -49,6 +56,11 @@ async function loadLocal(): Promise<Reranker> {
 export function getReranker(): Promise<Reranker> {
   loading ??= loadLocal();
   return loading;
+}
+
+/** Loads (downloads on first run) the re-rank model so the first /ask does not pay for it. */
+export async function warmReranker(): Promise<string> {
+  return (await getReranker()).name;
 }
 
 export async function rerank<T extends Rerankable>(

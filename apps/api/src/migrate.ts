@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { sql, closeDb } from './lib/db.js';
+import { sql, closeDb, ensureEmbeddingDim } from './lib/db.js';
 import { config } from './lib/config.js';
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
@@ -19,6 +19,9 @@ async function main() {
     });
     console.log(`applied ${f}`);
   }
+
+  await ensureEmbeddingDim(config.embedDim!);
+  console.log(`chunks.embedding = vector(${config.embedDim}) for ${config.models.embed}`);
 
   const s = config.demoSite;
   await sql`

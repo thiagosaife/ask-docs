@@ -5,6 +5,7 @@
  */
 import { config } from './config.js';
 import { sql, toVector, type ChunkRow } from './db.js';
+import { AskError } from './errors.js';
 import { embedTexts } from './llm.js';
 import type { UsageReport } from './llm.js';
 
@@ -69,5 +70,25 @@ export async function retrieveCandidates(opts: {
     order by f.rrf desc
     limit ${limit}`;
 
+  if (rows.length === 0) await explainEmptyIndex(opts.tenant);
   return { candidates: rows, embedUsage: usage };
+}
+
+/** Zero candidates is almost always a setup problem; say which one instead of answering from nothing. */
+async function explainEmptyIndex(tenant: string): Promise<void> {
+  const [row] = await sql<{ n: number; models: string[] }[]>`
+    select count(*)::int as n, coalesce(array_agg(distinct embed_model), '{}') as models
+    from chunks where tenant = ${tenant}`;
+  if (!row || row.n === 0) {
+    throw new AskError('index_empty', `no documents are indexed for site "${tenant}" — run: pnpm ingest`, false, 503);
+  }
+  const other = row.models.filter((m) => m !== config.models.embed);
+  if (other.length) {
+    throw new AskError(
+      'index_mismatch',
+      `index was embedded with ${other.join(', ')} but EMBED_MODEL is ${config.models.embed} — run: pnpm db:migrate && pnpm ingest --force`,
+      false,
+      503,
+    );
+  }
 }

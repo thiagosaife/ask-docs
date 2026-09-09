@@ -12,6 +12,7 @@ import { rerank } from './rerank.js';
 import { retrieveCandidates } from './retrieve.js';
 import { embedText } from './chunk.js';
 import { CitationScanner } from './citations.js';
+import { AskError } from './errors.js';
 import type { AskEvent, Citation } from './sse.js';
 import { tracer, truncate } from './trace.js';
 import { VERSION } from './version.js';
@@ -28,6 +29,8 @@ export interface AnswerOptions {
    * They are numbered after the retrieved ones so [n] stays consistent.
    */
   extraDocuments?: Array<{ header: string; content: string; url: string }>;
+  /** Word-level, paced deltas for a UI (see streamAnswer). Default false. */
+  smooth?: boolean;
   emit: (e: AskEvent) => void | Promise<void>;
 }
 
@@ -109,7 +112,12 @@ export async function answerQuestion(opts: AnswerOptions): Promise<AnswerResult>
   let text = '';
   let aborted = false;
 
-  const stream = streamAnswer({ system: SYSTEM_PROMPT, user, ...(opts.signal ? { signal: opts.signal } : {}) });
+  const stream = streamAnswer({
+    system: SYSTEM_PROMPT,
+    user,
+    ...(opts.signal ? { signal: opts.signal } : {}),
+    ...(opts.smooth ? { smooth: true } : {}),
+  });
   try {
     for await (const delta of stream.textStream) {
       if (opts.signal?.aborted) {
@@ -131,7 +139,12 @@ export async function answerQuestion(opts: AnswerOptions): Promise<AnswerResult>
   }
   if (opts.signal?.aborted) aborted = true;
 
+  // Rejects with the provider's error when the stream failed (see streamAnswer); the route turns it into an
+  // `error` frame with the real reason instead of a "done" frame with no text.
   const final = await stream.final;
+  if (!aborted && text.trim() === '') {
+    throw new AskError('empty_answer', `the model returned no text (finishReason=${final.finishReason})`, true, 502);
+  }
   const usage = {
     inputTokens: final.usage.inputTokens,
     outputTokens: final.usage.outputTokens,

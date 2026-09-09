@@ -5,6 +5,7 @@ import { config } from '../lib/config.js';
 import { bearerToken, originAllowed, siteForToken } from '../lib/auth.js';
 import { answerQuestion } from '../lib/answer.js';
 import { DailyBudget, MemoryTokenBucket } from '../lib/ratelimit.js';
+import { describeErrorForClient } from '../lib/errors.js';
 import { encodeSse, type AskErrorCode, type AskEvent } from '../lib/sse.js';
 import { tracer } from '../lib/trace.js';
 
@@ -68,20 +69,23 @@ askRoute.post('/ask', async (c) => {
           signal: ac.signal,
           userKey: ip,
           ...(sessionId ? { sessionId } : {}),
+          smooth: true,
           emit,
         });
       } catch (e) {
         if (!ac.signal.aborted) {
-          console.error('[ask] upstream error', (e as Error).message);
-          await emit({ event: 'error', data: { code: 'upstream', message: 'the answer service failed, please retry', retryable: true } });
+          const d = describeErrorForClient(e);
+          console.error(`[ask] ${d.code}: ${d.message}`);
+          await emit({ event: 'error', data: { code: d.code, message: d.message, retryable: d.retryable } });
         }
       } finally {
         void tracer.flush();
       }
     },
     async (e, stream) => {
-      console.error('[ask] stream error', e.message);
-      await stream.write(encodeSse({ event: 'error', data: { code: 'internal', message: 'stream failed', retryable: true } }));
+      const d = describeErrorForClient(e);
+      console.error(`[ask] stream ${d.code}: ${d.message}`);
+      await stream.write(encodeSse({ event: 'error', data: { code: d.code, message: `stream failed: ${d.message}`, retryable: true } }));
     },
   );
 });

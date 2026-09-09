@@ -16,14 +16,8 @@ export interface AskUsage {
   costUsd: number;
 }
 
-export type AskErrorCode =
-  | 'bad_request'
-  | 'unauthorized'
-  | 'origin_forbidden'
-  | 'rate_limited'
-  | 'budget_exceeded'
-  | 'upstream'
-  | 'internal';
+import type { AskErrorCode } from './errors.js';
+export type { AskErrorCode };
 
 export type AskEvent =
   | { event: 'meta'; data: { answerId: string; traceId: string; version: string; model: string } }

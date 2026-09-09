@@ -8,3 +8,4 @@ dist
 .DS_Store
 evals/results/promptfoo-*.json
 apps/api/.models
+.vscode

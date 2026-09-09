@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ask-docs demo</title>
+  <style>
+    body { margin: 0; font-family: Georgia, serif; background: #fafafa; color: #222; }
+    main { max-width: 760px; margin: 40px auto; padding: 0 20px; }
+    .themed { --ask-docs-accent: #6b4fbb; --ask-docs-radius: 6px; --ask-docs-font: 15px/1.5 Georgia, serif; }
+    nav a { margin-right: 16px; }
+    pre { background: #eee; padding: 8px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <main>
+    <nav><a href="./index.html">demo</a><a href="./plain.html">plain html (built bundle)</a><a href="./evals.html">evals</a></nav>
+    <h1>Ask the Vue docs</h1>
+    <p>The host page uses a serif font and no framework. The widget below is a Shadow DOM custom element; the second one is re-themed with CSS custom properties.</p>
+
+    <ask-docs id="w1" api-url="http://localhost:8787" site-token="pk_demo_vuejs" docs-origin="https://vuejs.org"
+              placeholder="e.g. How do I watch a nested property?"></ask-docs>
+
+    <h2>Themed</h2>
+    <ask-docs class="themed" api-url="http://localhost:8787" site-token="pk_demo_vuejs" docs-origin="https://vuejs.org"
+              heading="Vue docs helper"></ask-docs>
+
+    <h2>Events</h2>
+    <pre id="log"></pre>
+  </main>
+  <script type="module" src="/src/index.ts"></script>
+  <script type="module">
+    const log = document.getElementById('log');
+    for (const name of ['ask', 'answer', 'stop', 'error', 'citation-click']) {
+      document.addEventListener(`ask-docs:${name}`, (e) => {
+        const d = e.detail ?? {};
+        const short = name === 'answer' ? { answerId: d.answerId, chars: d.text.length, citations: d.citations.length, usage: d.usage } : d;
+        log.textContent = `${new Date().toLocaleTimeString()} ask-docs:${name} ${JSON.stringify(short)}\n` + log.textContent;
+      });
+    }
+  </script>
+</body>
+</html>

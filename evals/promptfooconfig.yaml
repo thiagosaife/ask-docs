@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: ask-docs · Vue docs · recall@5, faithfulness (cross-family judge), prompt-injection pass rate
+
+prompts:
+  - '{{q}}'
+
+providers:
+  - id: file://provider.ts
+    label: ask-docs
+
+tests: file://tests.ts
+
+# each test carries its own asserts (see tests.ts); no default asserts
+evaluateOptions:
+  maxConcurrency: 2
+  cache: false
+
+outputPath: results/promptfoo-latest.json

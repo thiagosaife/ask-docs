@@ -6,7 +6,10 @@
   "exports": {
     "./answer": "./src/lib/answer.ts",
     "./db": "./src/lib/db.ts",
-    "./config": "./src/lib/config.ts"
+    "./config": "./src/lib/config.ts",
+    "./llm": "./src/lib/llm.ts",
+    "./errors": "./src/lib/errors.ts",
+    "./version": "./src/lib/version.ts"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -17,11 +20,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.50",
-    "@ai-sdk/openai": "^4.0.62",
+    "@ai-sdk/anthropic": "4.0.49",
+    "@ai-sdk/openai": "4.0.60",
     "@hono/node-server": "^2.1.1",
     "@huggingface/transformers": "^4.2.0",
-    "ai": "^7.0.94",
+    "ai": "7.0.93",
     "cheerio": "^1.2.0",
     "domhandler": "^5.0.3",
     "dotenv": "^17.2.0",

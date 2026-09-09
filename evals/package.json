@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "eval": "tsx run.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "validate": "tsx validate.ts"
   },
   "dependencies": {
     "@ask-docs/api": "workspace:*",
-    "promptfoo": "^0.122.2"
+    "promptfoo": "^0.122.2",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

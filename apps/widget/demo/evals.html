@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ask-docs evals</title>
+  <style>
+    body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #fafafa; color: #222; }
+    main { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #ddd; white-space: nowrap; }
+    th { font-weight: 600; color: #555; font-size: 0.85em; text-transform: uppercase; letter-spacing: .04em; }
+    td.num { font-variant-numeric: tabular-nums; text-align: right; }
+    .bar { display: inline-block; height: 8px; background: #42b883; border-radius: 4px; vertical-align: middle; margin-right: 6px; }
+    .muted { color: #777; font-size: 0.9em; }
+    details { margin-top: 24px; }
+    pre { background: #eee; padding: 8px; overflow: auto; max-height: 50vh; font-size: 12px; }
+    nav a { margin-right: 16px; }
+  </style>
+</head>
+<body>
+  <main>
+    <nav><a href="./index.html">demo</a><a href="./plain.html">plain html</a><a href="./evals.html">evals</a></nav>
+    <h1>Evals by version</h1>
+    <p class="muted">recall@5 over the 40 labelled questions · faithfulness = claim-level support judged by a different model family · injection pass rate over the 5 prompt-injection cases · cost per answer includes the query embedding.</p>
+    <div id="out">Loading…</div>
+    <details><summary>Latest run details (per case)</summary><pre id="details"></pre></details>
+  </main>
+  <script>
+    const api = new URLSearchParams(location.search).get('api') || 'http://localhost:8787';
+    const pct = (x) => (x * 100).toFixed(1) + '%';
+    const bar = (x) => `<span class="bar" style="width:${Math.round(x * 80)}px"></span>${pct(x)}`;
+    (async () => {
+      const out = document.getElementById('out');
+      try {
+        const { runs } = await fetch(`${api}/evals?all=1`).then((r) => r.json());
+        if (!runs.length) { out.textContent = 'No eval runs yet. Run `pnpm eval`.'; return; }
+        out.innerHTML = `<table><thead><tr>
+          <th>version</th><th>ran</th><th>cases</th><th>recall@5</th><th>faithfulness</th><th>injection pass</th><th>cost / answer</th><th>models</th>
+        </tr></thead><tbody>${runs.map((r) => `<tr>
+          <td><code>${r.version}</code></td>
+          <td class="muted">${new Date(r.ranAt).toLocaleString()}</td>
+          <td class="num">${r.nCases}</td>
+          <td>${bar(r.recallAt5)}</td>
+          <td>${bar(r.faithfulness)}</td>
+          <td>${bar(r.injectionPassRate)}</td>
+          <td class="num">$${r.costPerAnswerUsd.toFixed(4)}</td>
+          <td class="muted">${r.answerModel} · judge ${r.judgeModel} · ${r.embedModel}</td>
+        </tr>`).join('')}</tbody></table>`;
+        const latest = await fetch(`${api}/evals?id=${runs[0].id}`).then((r) => r.json());
+        document.getElementById('details').textContent = JSON.stringify(latest.details, null, 2);
+      } catch (e) {
+        out.textContent = `Could not load ${api}/evals: ${e.message}`;
+      }
+    })();
+  </script>
+</body>
+</html>

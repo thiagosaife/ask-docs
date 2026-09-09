@@ -13,6 +13,7 @@ export interface IngestOptions {
   cacheDir: string;
   maxPages?: number;
   force?: boolean; // re-embed even if content hash unchanged
+  dryRun?: boolean; // crawl + chunk only: no embeddings, no DB writes (works without provider keys)
   log?: (msg: string) => void;
 }
 
@@ -61,6 +62,18 @@ export async function ingestSite(opts: IngestOptions): Promise<IngestReport> {
     });
     if (doc.chunks.length === 0) {
       log(`no chunks: ${page.url}`);
+      continue;
+    }
+    if (opts.dryRun) {
+      report.documentsUpdated++;
+      report.chunks += doc.chunks.length;
+      for (const c of doc.chunks) {
+        embeddedChunks++;
+        tokenSum += c.tokenCount;
+        report.tokenStats.min = Math.min(report.tokenStats.min, c.tokenCount);
+        report.tokenStats.max = Math.max(report.tokenStats.max, c.tokenCount);
+      }
+      log(`chunked ${doc.path} (${doc.chunks.length} chunks, dry run)`);
       continue;
     }
     const contentHash = sha(doc.chunks.map((c) => embedText(c)).join('\n---\n'));
