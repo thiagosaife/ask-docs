@@ -8,6 +8,7 @@
     "./db": "./src/lib/db.ts",
     "./config": "./src/lib/config.ts",
     "./llm": "./src/lib/llm.ts",
+    "./errors": "./src/lib/errors.ts",
     "./version": "./src/lib/version.ts"
   },
   "scripts": {

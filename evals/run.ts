@@ -7,14 +7,12 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-import { config } from '@ask-docs/api/config';
+import { config, providerStatus } from '@ask-docs/api/config';
+import { describeError } from '@ask-docs/api/errors';
 import { sql, closeDb } from '@ask-docs/api/db';
 import { VERSION } from '@ask-docs/api/version';
 import { EVALS_DIR, RESULTS_DIR, loadCases } from './lib.js';
 import { validateLabels } from './validate.js';
-
-const require = createRequire(import.meta.url);
 
 interface PfResult {
   vars: Record<string, unknown>;
@@ -33,6 +31,13 @@ async function main() {
   mkdirSync(RESULTS_DIR, { recursive: true });
 
   console.log(`ask-docs eval · version ${VERSION} · answer=${config.models.answer} judge=${config.models.judge} embed=${config.models.embed}`);
+  for (const [role, p] of Object.entries(providerStatus())) {
+    if (!p.ready) throw new Error(`${p.provider.toUpperCase()}_API_KEY is not set (needed for ${role} model ${p.model})`);
+  }
+  const [cnt] = await sql<{ chunks: number }[]>`select count(*)::int as chunks from chunks where tenant = ${config.demoSite.tenant}`;
+  if (!cnt || cnt.chunks === 0) {
+    throw new Error(`no documents indexed for site "${config.demoSite.tenant}" — run: pnpm ingest (refusing to spend model calls on an empty index)`);
+  }
   const problems = await validateLabels();
   if (problems.length) {
     console.warn(`\n⚠ ${problems.length} labelled section(s) not found in the index:`);
@@ -41,7 +46,9 @@ async function main() {
   }
 
   const out = path.join(RESULTS_DIR, `promptfoo-${runId}.json`);
-  const entry = require.resolve('promptfoo/package.json').replace(/package\.json$/, 'dist/src/entrypoint.js');
+  // promptfoo's exports map hides package.json, so resolve the CLI entry by path instead of require.resolve
+  const entry = path.join(EVALS_DIR, 'node_modules', 'promptfoo', 'dist', 'src', 'entrypoint.js');
+  if (!existsSync(entry)) throw new Error(`promptfoo not installed at ${entry} — run pnpm install`);
   const args = ['--import', 'tsx', entry, 'eval', '-c', 'promptfooconfig.yaml', '-o', out, '--no-cache', '--no-progress-bar', '--no-table'];
   const filter = process.argv.slice(2);
   if (filter.length) args.push('--filter-pattern', filter.join('|'));
@@ -140,7 +147,8 @@ function round(x: number, d = 4): number {
 }
 
 main().catch(async (e) => {
-  console.error(e);
+  const d = describeError(e);
+  console.error(`eval failed — ${d.code}: ${d.message}`);
   await closeDb().catch(() => {});
   process.exit(1);
 });

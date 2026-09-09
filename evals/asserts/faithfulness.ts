@@ -1,6 +1,7 @@
 /**
- * Faithfulness judge (claim-level). Runs on the JUDGE model — a different model family than the
- * answerer (OpenAI gpt-5-mini vs Anthropic claude-opus-5) — via the single provider module.
+ * Faithfulness judge (claim-level). Runs on the JUDGE model via the single provider module:
+ * gpt-5-mini (different family than the claude-opus-5 answerer) when an OpenAI key exists,
+ * otherwise claude-sonnet-5 (different model, same family). eval_runs.judge_model records which.
  *
  *   score = supported claims / all claims      (1.0 when the answer makes no factual claims,
  *                                               e.g. "the docs don't cover this")

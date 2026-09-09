@@ -10,6 +10,19 @@ Two apps in a pnpm workspace plus an evals package:
 
 All model calls go through **one module**, `apps/api/src/lib/llm.ts` (AI SDK): answerer, embeddings, judge.
 
+**Anthropic-first.** The app runs with `ANTHROPIC_API_KEY` alone:
+
+| role | default | provider | override |
+| --- | --- | --- | --- |
+| answer | `claude-opus-5` | Anthropic | `ANSWER_MODEL` |
+| embed | `Xenova/bge-small-en-v1.5` (384-d, int8 ONNX, ~33 MB, cached in `apps/api/.models`) | local, no key, $0 | `EMBED_MODEL=text-embedding-3-small` → OpenAI |
+| judge | `claude-sonnet-5` | Anthropic | `JUDGE_MODEL=gpt-5-mini` → OpenAI, cross-family |
+
+The provider is inferred from the model id (`claude-*` → Anthropic, contains `/` → local transformers.js, else OpenAI).
+`pnpm db:migrate` resizes `chunks.embedding` to the configured dimension (dropping indexed documents when it
+changes); `GET /health` lists per-role provider readiness and any setup problem; the API logs the same at startup
+and pre-loads both local ONNX models so the first question does not pay the download.
+
 ## Pipeline
 
 ```mermaid
@@ -17,12 +30,12 @@ flowchart LR
   subgraph ingest["POST /ingest (admin key)"]
     A[sitemap.xml\n/guide/** + /api/**] --> B[crawl\ndisk cache]
     B --> C[chunkHtml\nheading stack h1–h4\n200–800 tokens]
-    C --> D[embed\nheader + body]
+    C --> D[embed\nheader + body\nlocal bge-small]
     D --> E[(chunks\nvector(1536) + tsvector)]
   end
 
   subgraph ask["POST /ask (site token + origin allow-list + token bucket)"]
-    Q[question] --> QE[embed]
+    Q[question] --> QE[embed\nlocal bge-small]
     QE --> H{hybrid SQL\ncosine top-30 ∪ ts_rank_cd top-30\nRRF k=60 → 30}
     E --> H
     H --> R[cross-encoder re-rank\nms-marco-MiniLM-L-6-v2 → keep 5]
@@ -80,13 +93,21 @@ Content-Type: application/json
 Non-stream failures are JSON with the same error shape and an HTTP status:
 `401 unauthorized`, `403 origin_forbidden`, `429 rate_limited` (with `Retry-After`), `429 budget_exceeded`, `400 bad_request`.
 
+**Errors carry the real reason.** `lib/errors.ts` unwraps AI SDK / provider / Postgres / local-model failures into
+`{code, message, retryable}` where `message` is the provider's own text plus status (e.g.
+`OpenAI 429 error: You have no credits remaining.`), with key-looking tokens redacted. Codes beyond the four above:
+`config` (env var missing), `index_empty` (nothing ingested), `index_mismatch` (index embedded with another model),
+`database`, `embed_model` (local ONNX model failed to load), `provider_auth`, `provider_quota` (not retryable),
+`provider_rate_limited`, `provider_unavailable`, `provider_error`, `internal`. The same describer feeds the SSE
+`error` frame, JSON errors, the eval provider and the ingest CLI.
+
 Stream (`text/event-stream`). Every `data:` is a JSON object; the client never parses prose.
 
 | order | event | data |
 | --- | --- | --- |
 | 1 | `meta` | `{"answerId","traceId","version":"it1+p<hash>","model"}` |
 | 2 | `status` | `{"phase":"retrieving"}` then `{"phase":"generating"}` |
-| 3…n | `delta` | `{"text":"…"}` |
+| 3…n | `delta` | `{"text":"…"}` — word-sized: the server re-chunks the provider stream with the AI SDK's `smoothStream` (8 ms pacing) because Anthropic emits Opus 5 text in 80–200-character bursts that a UI shows as sentence-sized jumps. The eval path uses the raw stream. |
 | interleaved | `citation` | `{"n":2,"chunkId":"…","url":"https://vuejs.org/guide/…#deep-watchers","title":"Vue Guide › … › Deep Watchers"}` — emitted the first time the model references `[n]`; the server scans the token stream (`lib/citations.ts`, survives a marker split across deltas). Only `n` in `1..5` ever produce an event. |
 | last | `done` | `{"usage":{"inputTokens","outputTokens","embedTokens","costUsd"},"citations":[…],"traceId","finishReason"}` |
 | any | `error` | `{"code":"upstream|internal|…","message","retryable":bool}` |
@@ -124,15 +145,17 @@ See open questions.
 - promptfoo (`promptfooconfig.yaml`) runs `provider.ts` **in-process** (same `answerQuestion` as `/ask`), so asserts
   see exact chunk ids and the poisoned document can be injected without touching the corpus.
 - `recall@5` = hits / relevant per case, hit when a kept chunk is on the page and covers the heading id.
-- `faithfulness` = supported / all atomic claims, judged by **gpt-5-mini** (OpenAI) while the answerer is
-  **claude-opus-5** (Anthropic) — different families by construction (`lib/llm.ts`).
+- `faithfulness` = supported / all atomic claims, judged by the `JUDGE_MODEL`: **claude-sonnet-5** by default (a
+  different model than the claude-opus-5 answerer, same family); set `JUDGE_MODEL=gpt-5-mini` for a cross-family
+  judge. `eval_runs.judge_model` records which one produced each run.
 - `injection pass` = canary and forbidden strings absent from the answer.
 - `run.ts` aggregates promptfoo's JSON into `eval_runs` and `evals/results/<version>.json`; `GET /evals` serves
   runs by version; `apps/widget/demo/evals.html` renders them.
 
 ## Security model
 
-- Provider keys live only in `apps/api/.env`. The widget knows `api-url` and a **public** site token.
+- Provider keys live only in `apps/api/.env`. The widget knows `api-url` and a **public** site token. Error
+  messages sent to clients pass through `redactSecrets` so a provider echoing a key back can never reach the widget.
 - Site token → `sites` row → `tenant` + `allowed_origins`. `Origin` is checked on every `/ask`; CORS reflects only
   allow-listed origins. Tenant is never client-supplied; every retrieval query filters on it.
 - Per-IP token bucket (burst 5, 10/min) and a per-site daily answer budget (cost cap). In-memory behind an interface
@@ -147,9 +170,10 @@ See open questions.
 
 ```bash
 pnpm install && pnpm db:up && pnpm db:migrate         # Docker Desktop must be running
-cp .env.example apps/api/.env                          # add ANTHROPIC_API_KEY, OPENAI_API_KEY
+cp .env.example apps/api/.env                          # add ANTHROPIC_API_KEY (OPENAI_API_KEY optional)
 pnpm ingest --dry-run                                  # crawl + chunk only, no keys needed (81 pages, 515 chunks, ~10 s)
-pnpm ingest                                            # ~80 pages, ~1 min with cache
+pnpm ingest                                            # 81 pages, 515 chunks, ~30 s with local embeddings
+curl -s localhost:8787/health                          # providers, chunk count, embedDim, problems[]
 pnpm --filter @ask-docs/api dev                        # http://localhost:8787
 pnpm --filter @ask-docs/widget dev                     # http://localhost:5173/demo/index.html
 pnpm eval                                              # writes eval_runs + evals/results/*.json

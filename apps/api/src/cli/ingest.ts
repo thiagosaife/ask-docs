@@ -8,6 +8,7 @@ import { config } from '../lib/config.js';
 import { closeDb } from '../lib/db.js';
 import { ingestSite } from '../lib/ingest.js';
 import { CACHE_DIR } from '../routes/ingest.js';
+import { describeError } from '../lib/errors.js';
 
 const { values } = parseArgs({
   options: {
@@ -30,6 +31,10 @@ const report = await ingestSite({
   force: values.force,
   dryRun: values['dry-run'],
   log: (m) => console.log('[ingest]', m),
+}).catch((e) => {
+  const d = describeError(e);
+  console.error(`[ingest] failed — ${d.code}: ${d.message}`);
+  process.exit(1);
 });
 console.log(JSON.stringify({ ...report, seconds: Math.round((Date.now() - t0) / 1000) }, null, 2));
 if (!values['dry-run']) await closeDb();

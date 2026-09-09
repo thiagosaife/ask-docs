@@ -4,6 +4,7 @@
  */
 import { answerQuestion } from '@ask-docs/api/answer';
 import { config } from '@ask-docs/api/config';
+import { describeError } from '@ask-docs/api/errors';
 import { record } from './lib.js';
 
 interface CallContext {
@@ -47,8 +48,9 @@ export default class AskDocsProvider {
         metadata,
       };
     } catch (e) {
-      record('answer-error', { caseId: vars.id, error: (e as Error).message });
-      return { error: (e as Error).message };
+      const d = describeError(e);
+      record('answer-error', { caseId: vars.id, code: d.code, error: d.message });
+      return { error: `${d.code}: ${d.message}` };
     }
   }
 }
